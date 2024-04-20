@@ -1,0 +1,119 @@
+#!/usr/bin/bash
+
+# Colors
+RED='\e[1;31m'
+PINK='\e[1;35m'
+GREEN='\e[1;32m'
+BLUE='\e[1;34m'
+YELLOW='\e[1;33m'
+GRAY='\e[1;30m'
+WHITE='\e[1;38m'
+RESET='\e[0;0m'
+
+# Logging
+function log () {
+  local log_level="$1"
+  local log_msg_content="$2"
+
+  if [[ "DEBUG" =~ "$log_level" ]]; then
+    local log_level_content="${GRAY}[DEBUG]${RESET}"
+  elif [[ "INFO" =~ "$log_level" ]]; then
+    local log_level_content="${GREEN}[INFO]${RESET}"
+  elif [[ "WARN" =~ "$log_level" ]]; then
+    local log_level_content="${YELLOW}[WARN]${RESET}"
+  elif [[ "ERROR" =~ "$log_level" ]]; then
+    local log_level_content="${RED}[ERRO]${RESET}"
+  elif [[ "FATAL" =~ "$log_level" ]]; then
+    local log_level_content="${RED}[FATAL]${RESET}"
+  fi
+
+  echo -en "$log_level_content $log_msg_content"
+}
+
+# Paths
+_HERE="$PWD"
+_DOTFILES_PATH="$PWD/dotfiles"
+_DOTCAP_PATH="$_HERE/.dotcap"
+_DOTCAP_LST="$_DOTCAP_PATH/list"
+
+# To be sure
+log "INFO" "Dotfiles Folder Set ${BLUE}$_DOTFILES_PATH${RESET}\n"
+log "INFO" "Currently Directory ${YELLOW}$PWD${RESET}\n"
+log "INFO" "Want to continue? (${GREEN}y${RESET}/${RED}n${RESET}) "
+read -p "" _PROCEED > /dev/null
+
+case "$_PROCEED" in
+  y|Y|s|S ) ;;
+  n|N ) log "INFO" "Closing without operations" && exit 1;;
+  * ) log "ERROR" "Invalid option" && exit 1;;
+esac
+unset _PROCEED
+
+
+for _PATH in $_DOTFILES_PATH $_DOTCAP_PATH; do
+  if ! [[ -r "$_PATH" ]]; then
+    mkdir -p "$_PATH"
+    log "DEBUG" "Created path $_PATH\n"
+  fi
+done
+
+
+log "DEBUG" "Checking if a list containing files is available\n"
+if [[ -r "$_DOTCAP_LST" ]]; then
+    log "DEBUG" "lst is available at $_DOTCAP_LST\n"
+else
+    log "DEBUG" "lst is not available at $_DOTCAP_LST\n"
+    log "DEBUG" "Creating new lst at $_DOTCAP_LST\n"
+    touch "$_DOTCAP_LST" &&
+    log "DEBUG" "lst is now available at $_DOTCAP_LST\n" &&
+    log "INFO" "Empty list file created at $_DOTCAP_LST\n" &&
+    log "INFO" "please write fullpath of your files line per line\n" &&
+    log "INFO" "and run this script again\n" ||
+    log "ERROR" "Failed to create lst at $_DOTCAP_LST\n" && exit 1
+fi
+
+if [[ -r "$_DOTCAP_LST" ]]; then
+  _LST_CONTENT=()
+
+  while IFS="" read -r _LINE || [ -n "$_LINE" ]; do
+    _LST_CONTENT+=$(printf '%s ' "$_LINE")
+  done < "$_DOTCAP_LST"
+  log "DEBUG" "lst read successfully\n"
+else
+  log "ERROR" "Failed to read lst\n" && exit 1
+fi
+
+
+# Copying new files
+if [[ -r "$_DOTFILES_PATH" ]]; then
+  rm -rf "$_DOTFILES_PATH" &&
+  log "DEBUG" "Removed old dotfiles folder\n"
+
+  mkdir -p "$_DOTFILES_PATH"
+  log "DEBUG" "Created new dotfiles folder\n"
+
+  for _F in ${_LST_CONTENT[@]}; do
+    cp "$_F" "$_DOTFILES_PATH" -r --parents
+  done
+
+# # if [[ "$PWD" == "$DOTFILES_PATH" ]]; then
+# #   _GITIGNORE_REMOVE=$(git ls-files -io --exclude-from=.gitignore)
+# #
+# #   if [[ ! -z $_GITIGNORE_REMOVE ]]; then
+# #     echo -e "\n${yellow}Want to remove the following leftovers?"
+# #     echo -e "The following files will be removed: ${reset}\n"
+# #     echo -e "$_GITIGNORE_REMOVE\n"
+# #     echo -e "${yellow}Would you like to continue ${reset}(${green}y${reset}/${red}n${reset})?"
+# #
+# #     read -p "" _CHOICE > /dev/null
+# #     case "$_CHOICE" in
+# #       y|Y|s|S ) rm -rf $_GITIGNORE_REMOVE && echo -e "${yellow}Leftovers removed${reset}";;
+# #       n|N ) echo -e "${red}Aborted${reset}" && exit 1;;
+# #       * ) echo -e "${red}Invalid option${reset}" && exit 1;;
+# #     esac
+# #     unset _CHOICE
+# #   else
+# #     echo -e "${yellow}No unwanted leftovers${reset}"
+# #   fi
+fi
+
